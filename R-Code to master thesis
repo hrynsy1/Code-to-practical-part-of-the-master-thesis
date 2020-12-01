@@ -1,0 +1,1904 @@
+library("readxl")
+library("forecast")
+library("ggplot2")
+library("tseries")
+
+# ROZDZIAŁ 2
+
+  # Rysunek 2.1
+    AirPassengers.ts <- ts(AirPassengers, start = c(1949,1), frequency = 12)
+    AirPassengers.ts.decom <- decompose(AirPassengers.ts, "multiplicative")
+    
+    plot(AirPassengers.ts.decom,col="navyblue",lwd = 2,cex.axis = 0.9)
+
+  # Rysunek 2.2
+    lag.plot(AirPassengers.ts, lags = 12, do.lines = F, main = "Wykresy rozrzutu dla szeregu AirPassengers")
+    
+  # Rysunek 2.3
+    tsdisplay(AirPassengers.ts, main = 'Szereg czasowy AirPassengers oraz funkcje ACF i PACF')
+    
+# ROZDZIAŁ 3
+    
+  # Rysunek 3.1
+    USAccDeaths.ts <- USAccDeaths
+    USAccDeaths.ts[55]<-NA
+    
+    USAccDeaths.mean <- ts((USAccDeaths.ts[54]+USAccDeaths.ts[56])/2,start = c(1977,7),frequency = 12)
+    USAccDeaths.ts.mean <- USAccDeaths.ts
+    USAccDeaths.ts.mean[55]<-USAccDeaths.mean
+    
+    par(mfrow=c(2,1))
+    plot(USAccDeaths.ts,col="navyblue",lwd = 2,ylab= "")
+    title("Szereg czasowy z miesięczną agregacją")
+    
+    plot(USAccDeaths.ts.mean,col="navyblue",lwd = 2,ylab= "")
+    lines(USAccDeaths.mean,col="red",cex=1.1,ylab= "",type='p',pch=16)
+    
+  # Rysunek 3.2
+    par(mfrow=c(3,1))
+    plot(AirPassengers.ts, ylab = "AirPassengers", xlab= "Czas",col="navyblue",lwd = 2,main="Szereg czasowy AirPassengers")
+    plot(BoxCox(AirPassengers.ts, lambda = 0.5), ylab = "AirPassengers", xlab= "Czas",col="navyblue",lwd = 2,main="Transformacja pierwiastkowa (lambda=0.5)")
+    plot(BoxCox(AirPassengers.ts, lambda = 0), ylab = "AirPassengers", xlab= "Czas",col="navyblue",lwd = 2,main="Transformacja logarytmiczna (lambda=0)")
+    
+# ROZDZIAŁ 6
+    
+  # Rysunek 6.1
+    setwd("C:/Users/MM/Desktop")
+    dane_składka.ERGO_MTU <- as.data.frame(read_excel("Dane_do_mgr.xlsx",sheet="Dane_ERGO_MTU"))
+    dane_składka.ERGO_MTU[1:53,3] <- "ERGO Hestia"
+    
+    ggplot(data=dane_składka.ERGO_MTU, 
+           aes(x=Czas, y=Składka, group = Spółka, colour = Spółka)) +
+      geom_line(size=1) + 
+      theme(axis.text.x = element_text(angle = 90, hjust = 1),axis.text.y = element_text(angle = 90, hjust = 1)) +
+      labs(y= "Składka przypisana (mln zł.)",title = "Składka przypisana ERGO Hestii i MTU") +
+      scale_y_continuous(labels=function(x) format(x/1000,  decimal.mark = ",", scientific = FALSE))+
+      scale_color_manual(name="Spółki",values=c("red3", "blue"))
+    
+  # Rysunek 6.2
+    ggplot(data=dane_składka.ERGO_MTU[54:84,], 
+           aes(x=Czas, y=Składka, group = Spółka, colour = Spółka)) +
+      geom_line(size=1) + 
+      theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position = "none",axis.text.y = element_text(angle = 90, hjust = 1)) +
+      labs(y= "Składka przypisana (mln zł.)",title = "Składka przypisana MTU") +
+      scale_y_continuous(labels=function(x) format(x/1000,  decimal.mark = ",", scientific = FALSE))+
+      scale_color_manual(name="Groups",values=c( "blue"))
+
+  # Rysunek 6.3
+    dane_składka_MTU <- dane_składka.ERGO_MTU[54:84,]
+    dane_składka_MTU_ts <- ts(dane_składka_MTU[,c(2)],start=c(2007,1),frequency=4)
+    
+    dni_robocze_Q.mtu <- read_excel("Dane_do_mgr.xlsx",sheet="Dni_robocze_3Q2014")
+    dni_robocze_Q.mtu.ts <- ts(dni_robocze_Q.mtu, start = c(2007,1),frequency = 4)
+    srednia.liczba.dni.roboczych <- sum(dni_robocze_Q.mtu.ts)/length(dni_robocze_Q.mtu.ts) #dni robocze od 2007q1 do 2014q3
+
+    dane_składka_MTU_ts_trading_days <- (dane_składka_MTU_ts/dni_robocze_Q.mtu.ts) * srednia.liczba.dni.roboczych
+    
+    par(mfrow=c(1,1))
+    ts.plot(dane_składka_MTU_ts,dane_składka_MTU_ts_trading_days,
+            xlab="Czas",
+            ylab="Składka przypisana (tys. zł)",
+            col=c("black","red"),
+            lty=c(1,2),lwd=1.9, type="l")
+    title("Składka przypisana MTU - korekty kalendarzowe", adj=0)
+    legend("bottomright",
+           legend=c("dane oryginalne", "dane skorygowane"),
+           col=c("black","red"),lty=c(1,2),lwd=1.9)
+    
+  # Rysunek 6.4
+    MTU_dec_add <- decompose(dane_składka_MTU_ts_trading_days, type = 'additive')
+    MTU_dec_mul <- decompose(dane_składka_MTU_ts_trading_days, type = 'multiplicative')
+    
+    MTU_addytywna <- na.omit(MTU_dec_add$random)
+    MTU_multyplik.<- na.omit(MTU_dec_mul$random)
+    
+    par(mfrow = c(1,2),oma = c(0, 0, 1.1, 0))
+    plot(MTU_addytywna,ylab=NULL,xlab=NULL,main="addytywnej")
+    grid()
+    plot(MTU_multyplik.,ylab=NULL,xlab=NULL,main="multiplikatywnej")
+    grid()
+    mtext("Reszta z szeregu po dekompozycji:", outer = T, cex = 1.5)
+    
+  # Tabela 6.2
+    adf.test(na.omit(MTU_dec_add$random))
+    adf.test(na.omit(MTU_dec_mul$random))
+  
+  # Transformacja Boxa-Coxa dla szeregu MTU
+    dane_składka_MTU_ts_trading_days.sqrt <- BoxCox(dane_składka_MTU_ts_trading_days, lambda=0.5) #sqrt(X(t))
+    dane_składka_MTU_ts_trading_days.log  <- BoxCox(dane_składka_MTU_ts_trading_days, lambda=0)   #log(X(t))
+    
+    MTU_lambda.auto <- BoxCox.lambda(dane_składka_MTU_ts_trading_days)
+    dane_składka_MTU_ts_trading_days.auto <- BoxCox(dane_składka_MTU_ts_trading_days, lambda=MTU_lambda.auto)
+    
+    par(mfrow = c(3,1))
+    plot(dane_składka_MTU_ts_trading_days, main="dane oryginalne")
+    grid()
+    plot(dane_składka_MTU_ts_trading_days.sqrt, main="transformacja pierwiastkowa lamdba=0.5")
+    grid()
+    plot(dane_składka_MTU_ts_trading_days.log, main="transformacja logarytmiczna lamdba=0 ")
+    grid() 
+    
+    par(mfrow = c(2,1))
+    plot(dane_składka_MTU_ts_trading_days, main="dane oryginalne")
+    grid()
+    plot(dane_składka_MTU_ts_trading_days.auto, main="transformacja lamdba = 0.8839871")
+    grid()
+    
+  # Rysunek 6.5   
+    par(mfrow = c(1,2),oma = c(0, 0, 1.1, 0))
+    monthplot(dane_składka_MTU_ts_trading_days,col.base='red3',lty.base=1, lwd.base =2,xlab='Kwartał',ylab='Składka przypisana (tys. zł)')
+    seasonplot(dane_składka_MTU_ts_trading_days,cex=0.8, col=rainbow(14), year.labels= TRUE, pch=19,main=NULL,xlab='Kwartał')
+    mtext("Wykresy sezonowości dla szeregu MTU 4Q2014", outer = T, cex = 1.5)
+
+  # Rysunek 6.6   
+    lag.plot(dane_składka_MTU_ts_trading_days,main=NULL,layout = c(2,3),
+             lags=6,do.lines=FALSE, pch = "X", col = "navyblue")  
+   
+  # Rysunek 6.7
+    par(mfrow = c(1,2),oma = c(0, 0, 1.1, 0))
+  
+    Acf(dane_składka_MTU_ts_trading_days,lag.max=20,main="a) ACF")
+    Pacf(dane_składka_MTU_ts_trading_days,lag.max=20,main="b) PACF")
+    mtext("Wykresy ACF i PACF dla szeregu MTU 4Q2014", outer = T, cex = 1.5)
+    
+    Acf(diff(dane_składka_MTU_ts_trading_days,lag=1),lag.max=20,main="c) ACF diff=1")
+    Pacf(diff(dane_składka_MTU_ts_trading_days,lag=1),lag.max=20,main="d) PACF diff=1")
+    
+    Acf(diff(diff(dane_składka_MTU_ts_trading_days,lag=1),lag=4),lag.max=20,main="e) ACF diff=1, diff=4")
+    Pacf(diff(diff(dane_składka_MTU_ts_trading_days,lag=1),lag=4),lag.max=20,main="f) PACF diff=1, diff=4")
+
+
+  # Rysunek 6.8
+    decom_1  <- tslm(dane_składka_MTU_ts_trading_days~ trend)  
+    decom_1s <- tslm(dane_składka_MTU_ts_trading_days~season + poly(trend, raw=TRUE, degree=1)) 
+    decom_2s <- tslm(dane_składka_MTU_ts_trading_days~season + poly(trend, raw=TRUE, degree=2))  
+    decom_3s <- tslm(dane_składka_MTU_ts_trading_days~season + poly(trend, raw=TRUE, degree=3))  
+    decom_4s <- tslm(dane_składka_MTU_ts_trading_days~season + poly(trend, raw=TRUE, degree=4))  
+    decom_5s <- tslm(dane_składka_MTU_ts_trading_days~season + poly(trend, raw=TRUE, degree=5))  
+    
+    par(mfrow = c(1,2),oma = c(0, 0, 1.5, 0))
+    
+    plot(dane_składka_MTU_ts_trading_days,main="a) Trend liniowy")
+    lines(fitted(decom_1),col='red',lty=2)
+    
+    plot(dane_składka_MTU_ts_trading_days,main="b) Trend liniowy z sez.")
+    lines(fitted(decom_1s),col='red',lty=2)
+    mtext("Dekompozycja parametryczna szeregu MTU 4Q2014", outer = T, cex = 1.5)
+    
+    plot(dane_składka_MTU_ts_trading_days,main="c) Trend wielomianowy st. 2 z sez.")
+    lines(fitted(decom_2s),col='red',lty=2)
+    
+    plot(dane_składka_MTU_ts_trading_days,main="d) Trend wielomianowy st. 3 z sez.")
+    lines(fitted(decom_3s),col='red',lty=2)
+    
+    plot(dane_składka_MTU_ts_trading_days,main="e) Trend wielomianowy st. 4 z sez.")
+    lines(fitted(decom_4s),col='red',lty=2)
+
+    plot(dane_składka_MTU_ts_trading_days,main="f) Trend wielomianowy st. 5 z sez.")
+    lines(fitted(decom_5s),col='red',lty=2)
+    
+  # Tabela 6.3
+    AIC(decom_1,decom_1s,decom_2s,decom_3s,decom_4s,decom_5s)
+    BIC(decom_1,decom_1s,decom_2s,decom_3s,decom_4s,decom_5s)
+    
+  # Rysunek 6.9
+    # Różnicowanie:
+    dane_składka_MTU_ts_trading_days.diff4.diff1 <- diff(diff(dane_składka_MTU_ts_trading_days,lag=1),lag=4)
+    
+    wyniki.mtu.trading_days.diff4.diff1 <-
+      ts(c(
+        dane_składka_MTU_ts_trading_days.diff4.diff1,
+        rep(mean(dane_składka_MTU_ts_trading_days.diff4.diff1),5)
+          ),start=c(2008,2),frequency = 4)
+    
+    wyniki.dane_składka_MTU_ts_trading_days.diff4 <- 
+      diffinv(wyniki.mtu.trading_days.diff4.diff1, xi = 17243.938)
+    
+    wyniki.dane_składka_MTU_ts_trading_days <- 
+      diffinv(wyniki.dane_składka_MTU_ts_trading_days.diff4,
+              lag=4,differences=1, 
+              xi = c(53798.06,  73903.13,  72848.67,  55178.00))
+    
+    wyniki.dni_robocze_Q.mtu.ts <- ts(c(dni_robocze_Q.mtu.ts,62,62,62,65,63), 
+                                  start = c(2007,1), frequency = 4)
+    
+    wyniki.dane_składka_MTU_ts <- 
+      wyniki.dane_składka_MTU_ts_trading_days*wyniki.dni_robocze_Q.mtu.ts/srednia.liczba.dni.roboczych
+    
+    # Arima()
+    MTU.model.auto<-
+      Arima(dane_składka_MTU_ts,
+            order = c(0,1,0),
+            seasonal = list(order=c(0,1,0),period=4))
+    f_arima0 <- forecast(MTU.model.auto,h=5)
+    
+    # Dekompozycja
+    f_decom_3s<- forecast(decom_3s,h=5)
+    
+    wyniki_decom_korekty_kal <- f_decom_3s$mean*c(62,62,62,65,63)/srednia.liczba.dni.roboczych
+    
+    # Wykres
+    par(mfrow = c(1,1))
+    plot(wyniki.dane_składka_MTU_ts,col='white', main="Prognozy szeregu MTU",ylab="Składka przypisana (tys. zł)",xlab="Rok")
+    lines(dane_składka_MTU_ts,col='black')
+    lines(ts(wyniki_decom_korekty_kal,start = c(2014,4),frequency = 4), col='red3')
+    lines(ts(wyniki.dane_składka_MTU_ts[32:36],start = c(2014,4),frequency = 4),col='navyblue')
+    lines(f_arima0$mean,col='darkgreen')
+    
+    lines(ts(wyniki_decom_korekty_kal[1],start = c(2014,4),frequency = 4), col='red3',type='p',pch=16)
+    lines(ts(wyniki_decom_korekty_kal[-1],start = c(2015,1),frequency = 4), col='red3',type='p',pch=1)
+    lines(ts(wyniki.dane_składka_MTU_ts[32],start = c(2014,4),frequency = 4),col='navyblue',type='p',pch=16)
+    lines(ts(wyniki.dane_składka_MTU_ts[33:36],start = c(2015,1),frequency = 4),col='navyblue',type='p',pch=1)
+    lines(ts(f_arima0$mean[1],start = c(2014,4),frequency = 4),col='darkgreen',type='p',pch=16)
+    lines(f_arima0$mean,col='darkgreen',type='p',pch=1)
+    
+    legend("topleft",
+           legend=c("różnicowanie", "dekompozycja par.", "f.Arima"),
+           col=c("navyblue","red3","darkgreen"),pch=c(16,16,16),lty=c(1,1,1),lwd=1.9)
+
+    # Wynik
+    wyniki.dane_składka_MTU_ts[32]
+    
+  # Rysunek 6.10
+    dane_składka <- dane_składka.ERGO_MTU[1:53,2]
+    dane_składka.ERGO <- ts(dane_składka,start=c(2007,1),frequency=4)
+    
+    # DANE ERGO DO MOMENTU PIKU
+    dane_składka.ERGO.pik <- ts(dane_składka.ERGO[1:31],start = c(2007,1), frequency = 4)
+    dni_robocze_Q.ergo.pik <- read_excel("Dane_do_mgr.xlsx",sheet="Dni_robocze_3Q2014")
+    dni_robocze_Q.ergo.pik.ts <- ts(dni_robocze_Q.ergo.pik, start = c(2007,1),frequency = 4)
+    Szereg_ERGO_4Q2014 <- dni_robocze_Q.ergo.pik.ts # do zmiany napisów w lag.plot
+    
+    srednia.liczba.dni.roboczych <- sum(Szereg_ERGO_4Q2014)/length(Szereg_ERGO_4Q2014) #dni robocze od 2007q1 do 2014q3
+    
+    
+    dane_składka.ERGO.pik_trading_days <- (dane_składka.ERGO.pik/Szereg_ERGO_4Q2014) * srednia.liczba.dni.roboczych
+    
+    
+    par(mfrow=c(1,1))  
+    ts.plot(dane_składka.ERGO.pik,dane_składka.ERGO.pik_trading_days,
+            col=c("black","red"),
+            xlab="Czas",
+            ylab="Składka przypisana (tys. zł)",
+            lty=c(1,2), type="l")
+    title("Składka przypisana ERGO Hestii - korekty kalendarzowe", adj=0)
+    legend("bottomright",
+           legend=c("dane oryginalne", "dane skorygowane"),
+           col=c("black","red"),lty=c(1,2))
+
+  # Rysunek 6.11
+    ergo.pik_dec_add <- decompose(dane_składka.ERGO.pik_trading_days, type = 'additive')
+    ergo.pik_dec_mul <- decompose(dane_składka.ERGO.pik_trading_days, type = 'multiplicative')
+    
+    ergo.pik_addytywna <- na.omit(ergo.pik_dec_add$random)
+    ergo.pik_multyplik.<- na.omit(ergo.pik_dec_mul$random)
+    
+    par(mfrow = c(1,2),oma = c(0, 0, 1.1, 0))
+    plot(ergo.pik_addytywna,ylab=NULL,xlab=NULL,main="addytywnej")
+    grid()
+    plot(ergo.pik_multyplik.,ylab=NULL,xlab=NULL,main="multiplikatywnej")
+    grid()
+    mtext("Reszta z szeregu po dekompozycji:", outer = T, cex = 1.5)  
+    
+  # Tabela 6.4
+    adf.test(na.omit(ergo.pik_dec_add$random)) #Dickey-Fuller = -4.9552, Lag order = 2, p-value = 0.01 #stacj.
+    adf.test(na.omit(ergo.pik_dec_mul$random)) #Dickey-Fuller = -4.2991, Lag order = 2, p-value = 0.01252 #stacj.
+    
+  # Rysunek 6.12
+    dane_składka.ERGO.pik_trading_days.sqrt <- BoxCox(dane_składka.ERGO.pik_trading_days, lambda=0.5) #sqrt(X(t))
+    dane_składka.ERGO.pik_trading_days.log  <- BoxCox(dane_składka.ERGO.pik_trading_days, lambda=0)   #log(X(t))
+    
+    ERGO_pik_lambda.auto <- BoxCox.lambda(dane_składka.ERGO.pik_trading_days)
+    dane_składka.ERGO.pik_trading_days.auto <- BoxCox(dane_składka.ERGO.pik_trading_days, lambda=ERGO_pik_lambda.auto)
+    #transformacja dla lambdy = 0 oraz 0.5
+    par(mfrow = c(3,1))
+    plot(dane_składka.ERGO.pik_trading_days, main="dane oryginalne")
+    grid()
+    plot(dane_składka.ERGO.pik_trading_days.sqrt, main="transformacja pierwiastkowa lamdba=0.5")
+    grid()
+    plot(dane_składka.ERGO.pik_trading_days.log, main="transformacja logarytmiczna lamdba=0 ") # może to???
+    grid()
+    #transformacja dla lambdy wybranej automatycznie
+    par(mfrow = c(1,1))
+    plot(dane_składka.ERGO.pik_trading_days, main="Dane oryginalne",ylab="Składka przypisana")
+    grid()
+    plot(dane_składka.ERGO.pik_trading_days.auto, main="Transformacja Boxa-Coxa (lambda=-0.9999242)",ylab="Składka przypisana")
+    grid()
+    
+  # Rysunek 6.13
+    par(mfrow=c(1,2),oma = c(0, 0, 1.1, 0)) # jakie małe, w prawo, margines u góry? , w lewo?
+    monthplot(dane_składka.ERGO.pik_trading_days,col.base='red3',lty.base=1, lwd.base =2,xlab='Kwartał',ylab='Składka przypisana (tys. zł)')
+    seasonplot(dane_składka.ERGO.pik_trading_days,cex=0.8, col=rainbow(14), year.labels= TRUE, pch=19,main=NULL,xlab='Kwartał')
+    mtext("Wykresy sezonowości dla szeregu ERGO 4Q2014", outer = TRUE,cex=1.5)
+    
+  # Rysunek 6.14
+    par(mfrow=c(1,2),oma = c(0, 0, 1.1, 0))
+    Acf(dane_składka.ERGO.pik_trading_days,lag.max=10,main="a) ACF")
+    Pacf(dane_składka.ERGO.pik_trading_days,lag.max=10,main="b) PACF")
+    mtext("Wykresy ACF i PACF dla szeregu ERGO_4Q2014", outer = T, cex = 1.5)
+    
+    Acf(diff(dane_składka.ERGO.pik_trading_days,lag=1),lag.max=10,main="c) ACF diff=1")
+    Pacf(diff(dane_składka.ERGO.pik_trading_days,lag=1),lag.max=10,main="d) PACF diff=1")
+    
+    Acf(diff(dane_składka.ERGO.pik_trading_days,lag=4),lag.max=10,main="e) ACF diff=4")
+    Pacf(diff(dane_składka.ERGO.pik_trading_days,lag=4),lag.max=10,main="f) PACF diff=4")
+    
+  # Zbiory testowe i treningowe (+walidacyjne)
+    ERGO.pik.train1<- window(dane_składka.ERGO.pik_trading_days, end=c(2010,4))
+    ERGO.pik.test1 <- window(dane_składka.ERGO.pik_trading_days, start=c(2011,1),end=c(2012,4))
+    
+    ERGO.pik.train2 <- window(dane_składka.ERGO.pik_trading_days, end=c(2012,4))
+    ERGO.pik.test2 <- window(dane_składka.ERGO.pik_trading_days, start=c(2013,1))
+    
+  # Modele
+    ERGO.pik.model1.ar1.ml <-
+      Arima(ERGO.pik.train1,
+            order = c(0,0,0),
+            seasonal = list(order=c(1,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML")
+      )
+    
+    ERGO.pik.model2.ar1.ml <-
+      Arima(ERGO.pik.train2,
+            order = c(0,0,0),
+            seasonal = list(order=c(1,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML")
+      )
+    
+    
+    ERGO.pik.model2.ar1.ml.d <-
+      Arima(ERGO.pik.train2,
+            order = c(0,0,0),
+            seasonal = list(order=c(1,1,0),period=4),
+            include.drift=T,
+            lambda=NULL,
+            method = c("CSS-ML")
+      )
+    
+    ERGO.pik.model1.ma1.ml <-
+      Arima(ERGO.pik.train1,
+            order = c(0,0,0),
+            seasonal = list(order=c(0,1,1),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML")
+      )
+    
+    ERGO.pik.model2.ma1.ml <-
+      Arima(ERGO.pik.train2,
+            order = c(0,0,0),
+            seasonal = list(order=c(0,1,1),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML")
+      )
+    
+    ERGO.pik.model2.ma1.ml.d <-
+      Arima(ERGO.pik.train2,
+            order = c(0,0,0),
+            seasonal = list(order=c(0,1,1),period=4),
+            include.drift=T,
+            lambda=NULL,
+            method = c("CSS-ML")
+      )
+    
+    ERGO.pik.model1.ma4.ml <-
+      Arima(ERGO.pik.train1,
+            order = c(0,0,4),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML")
+      )
+    
+    ERGO.pik.model2.ma4.ml <-
+      Arima(ERGO.pik.train2,
+            order = c(0,0,4),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML")
+      )
+    
+    ERGO.pik.model1.ar4.ml <-
+      Arima(ERGO.pik.train1,
+            order = c(4,0,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("ML")
+      )
+    
+    ERGO.pik.model2.ar4.ml <-
+      Arima(ERGO.pik.train2,
+            order = c(4,0,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML")
+      )
+    
+    ERGO.pik.f2_2 <- forecast(ERGO.pik.model2.ar1.ml,h=7)
+    ERGO.pik.f4_2 <- forecast(ERGO.pik.model2.ar1.ml.d,h=7)
+    ERGO.pik.f6_2 <- forecast(ERGO.pik.model2.ma1.ml,h=7)
+    ERGO.pik.f8_2 <- forecast(ERGO.pik.model2.ma1.ml.d,h=7)
+    ERGO.pik.f9_2 <- forecast(ERGO.pik.model2.ma4.ml,h=7)
+    ERGO.pik.f11_2 <- forecast(ERGO.pik.model2.ar4.ml,h=7)
+
+    ERGO.pik.f2_1 <- forecast(ERGO.pik.model1.ar1.ml,h=8)
+    ERGO.pik.f6_1 <- forecast(ERGO.pik.model1.ma1.ml,h=8)
+    ERGO.pik.f9_1 <- forecast(ERGO.pik.model1.ma4.ml,h=8)
+    ERGO.pik.f11_1 <- forecast(ERGO.pik.model1.ar4.ml,h=8)
+    
+  # Tabela 6.5
+    kryteria <- c("MAE","RMSE","MAPE","MASE")
+    
+    ERGO.pik.acc.f2.test_2 <- accuracy(ERGO.pik.f2_2,ERGO.pik.test2)[,kryteria]
+    ERGO.pik.acc.f4.test_2 <- accuracy(ERGO.pik.f4_2,ERGO.pik.test2)[,kryteria]
+    ERGO.pik.acc.f6.test_2 <- accuracy(ERGO.pik.f6_2,ERGO.pik.test2)[,kryteria]
+    ERGO.pik.acc.f8.test_2 <- accuracy(ERGO.pik.f8_2,ERGO.pik.test2)[,kryteria]
+    ERGO.pik.acc.f9.test_2 <- accuracy(ERGO.pik.f9_2,ERGO.pik.test2)[,kryteria]
+    ERGO.pik.acc.f11.test_2 <- accuracy(ERGO.pik.f11_2,ERGO.pik.test2)[,kryteria]
+    
+    ERGO.pik.Test.set_2 <- rbind(
+      ERGO.pik.acc.f2.test_2[2,],ERGO.pik.acc.f4.test_2[2,],ERGO.pik.acc.f6.test_2[2,],
+      ERGO.pik.acc.f8.test_2[2,],ERGO.pik.acc.f9.test_2[2,],ERGO.pik.acc.f11.test_2[2,])
+    
+    rownames(ERGO.pik.Test.set_2)<- c(
+        'ar(1) ML','ar(1) ML dryf','ma(1) ML','ma(1) ML dryf','ma(4) ML', 'ar(4) ML')
+    ERGO.pik.Test.set_2
+
+    ERGO.pik.Training.set_2 <- rbind(
+      ERGO.pik.acc.f2.test_2[1,],ERGO.pik.acc.f4.test_2[1,],ERGO.pik.acc.f6.test_2[1,],
+      ERGO.pik.acc.f8.test_2[1,],ERGO.pik.acc.f9.test_2[1,],ERGO.pik.acc.f11.test_2[1,])
+    
+    rownames(ERGO.pik.Training.set_2)<- c(
+        'ar(1) ML','ar(1) ML dryf','ma(1) ML','ma(1) ML dryf','ma(4) ML', 'ar(4) ML')
+    ERGO.pik.Training.set_2
+    
+    
+    ERGO.pik.zbiór.AIC_2 <-
+      data.frame(c(
+        ERGO.pik.model2.ar1.ml$aic,
+        ERGO.pik.model2.ar1.ml.d$aic,
+        ERGO.pik.model2.ma1.ml$aic,
+        ERGO.pik.model2.ma1.ml.d$aic,
+        ERGO.pik.model2.ma4.ml$aic,
+        ERGO.pik.model2.ar4.ml$aic
+        
+      ))
+    rownames(ERGO.pik.zbiór.AIC_2)<-
+      c('ar(1) ML','ar(1) ML dryf','ma(1) ML','ma(1) ML dryf','ma(4) ML','ar(4) ML')
+    colnames(ERGO.pik.zbiór.AIC_2)<- 'AIC'
+    ERGO.pik.zbiór.AIC_2
+    
+    ERGO.pik.zbiór.BIC_2 <-
+      data.frame(c(
+        ERGO.pik.model2.ar1.ml$bic,
+        ERGO.pik.model2.ar1.ml.d$bic,
+        ERGO.pik.model2.ma1.ml$bic,
+        ERGO.pik.model2.ma1.ml.d$bic,
+        ERGO.pik.model2.ma4.ml$bic,
+        ERGO.pik.model2.ar4.ml$bic
+      ))
+    rownames(ERGO.pik.zbiór.BIC_2)<-
+      c('ar(1) ML','ar(1) ML dryf','ma(1) ML','ma(1) ML dryf','ma(4) ML','ar(4) ML')
+    colnames(ERGO.pik.zbiór.BIC_2)<- 'BIC'
+    ERGO.pik.zbiór.BIC_2
+    
+    ERGO.pik.zbiór.AICC_2 <-
+      data.frame(c(
+        ERGO.pik.model2.ar1.ml$aicc,
+        ERGO.pik.model2.ar1.ml.d$aicc,
+        ERGO.pik.model2.ma1.ml$aicc,
+        ERGO.pik.model2.ma1.ml.d$aicc,
+        ERGO.pik.model2.ma4.ml$aicc,
+        ERGO.pik.model2.ar4.ml$aicc
+      ))
+    rownames(ERGO.pik.zbiór.AICC_2)<-c('ar(1) ML','ar(1) ML dryf','ma(1) ML','ma(1) ML dryf','ma(4) ML','ar(4) ML')
+    colnames(ERGO.pik.zbiór.AICC_2)<- 'AICC'
+    ERGO.pik.zbiór.AICC_2
+    
+    ERGO.pik.wyniki_2 <- cbind(ERGO.pik.zbiór.AIC_2,ERGO.pik.zbiór.BIC_2,ERGO.pik.zbiór.AICC_2,ERGO.pik.Training.set_2,ERGO.pik.Test.set_2)
+    ERGO.pik.wyniki_2
+    
+  # Tabela 6.6
+    ERGO.pik.model2.ma4.ml.coef <- ERGO.pik.model2.ma4.ml$coef
+    ERGO.pik.model2.ma4.ml.coef.std <- sqrt(diag(ERGO.pik.model2.ma4.ml$var.coef))
+    ERGO.pik.ratios3 <- ERGO.pik.model2.ma4.ml.coef/(1.96*ERGO.pik.model2.ma4.ml.coef.std)
+    ERGO.pik.istotne3 <- which(abs(ERGO.pik.ratios3)>=1)
+    
+    ERGO.pik.model2.ar4.ml.coef <- ERGO.pik.model2.ar4.ml$coef
+    ERGO.pik.model2.ar4.ml.coef.std <- sqrt(diag(ERGO.pik.model2.ar4.ml$var.coef))
+    ERGO.pik.ratios4 <- ERGO.pik.model2.ar4.ml.coef/(1.96*ERGO.pik.model2.ar4.ml.coef.std)
+    ERGO.pik.istotne4 <- which(abs(ERGO.pik.ratios4)>=1)
+    
+    ERGO.pik.ratios3
+    ERGO.pik.ratios4
+    
+  #Utworzenie nowych modeli
+    
+    ERGO.pik.model3.fixed<-numeric(4)
+    ERGO.pik.model4.fixed<-numeric(4)
+    
+    ERGO.pik.model3.fixed[ERGO.pik.istotne3]<-NA
+    ERGO.pik.model4.fixed[ERGO.pik.istotne4]<-NA
+    
+    ERGO.pik.model3_2.subset <-
+      Arima(ERGO.pik.train2,
+            order = c(0,0,4),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=ERGO.pik.model3.fixed
+      )
+    
+    ERGO.pik.model3_1.subset <-
+      Arima(ERGO.pik.train1,
+            order = c(0,0,4),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=ERGO.pik.model3.fixed
+      )
+    
+    ERGO.pik.model4_2.subset <-
+      Arima(ERGO.pik.train2,
+            order = c(4,0,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=ERGO.pik.model4.fixed
+      )
+    
+    ERGO.pik.model4_1.subset <-
+      Arima(ERGO.pik.train1,
+            order = c(4,0,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=ERGO.pik.model4.fixed
+      )    
+    
+  # Tabela 6.7  
+    ERGO.pik.f_2_ma4_ist <- forecast(ERGO.pik.model3_2.subset,h=7)
+    ERGO.pik.acc.f_2_ma4_ist<- accuracy(ERGO.pik.f_2_ma4_ist,ERGO.pik.test2)[,kryteria]
+    
+    ERGO.pik.f_2_ar4_ist <- forecast(ERGO.pik.model4_2.subset,h=7)
+    ERGO.pik.acc.f_2_ar4_ist <- accuracy(ERGO.pik.f_2_ar4_ist,ERGO.pik.test2)[,kryteria]
+
+    ERGO.pik.Test.set_2_ist <- rbind(ERGO.pik.acc.f_2_ar4_ist[2,],ERGO.pik.acc.f_2_ma4_ist[2,])
+    rownames(ERGO.pik.Test.set_2_ist)<- c('ar(4) ist','ma(4) ist')
+    
+    ERGO.pik.Training.set_2_ist <- rbind(ERGO.pik.acc.f_2_ar4_ist[1,],ERGO.pik.acc.f_2_ma4_ist[1,])
+    rownames(ERGO.pik.Training.set_2_ist)<- c('ar(4) ist','ma(4) ist')
+    
+    ERGO.pik.zbiór.AIC_2_ist <-
+      data.frame(c(
+        ERGO.pik.model4_2.subset$aic,
+        ERGO.pik.model3_2.subset$aic
+      ))
+    rownames(ERGO.pik.zbiór.AIC_2_ist)<-
+      c(    'ar(4) ist','ma(4) ist')
+    colnames(ERGO.pik.zbiór.AIC_2_ist)<- 'AIC'
+
+    ERGO.pik.zbiór.BIC_2_ist <-
+      data.frame(c(
+        ERGO.pik.model4_2.subset$bic,
+        ERGO.pik.model3_2.subset$bic
+      ))
+    rownames(ERGO.pik.zbiór.BIC_2_ist)<-
+      c(    'ar(4) ist','ma(4) ist')
+    colnames(ERGO.pik.zbiór.BIC_2_ist)<- 'BIC'
+    
+    ERGO.pik.zbiór.AICC_2_ist <-
+      data.frame(c(
+        ERGO.pik.model4_2.subset$aicc,
+        ERGO.pik.model3_2.subset$aicc
+      ))
+    rownames(ERGO.pik.zbiór.AICC_2_ist)<-
+      c(    'ar(4) ist','ma(4) ist')
+    colnames(ERGO.pik.zbiór.AICC_2_ist)<- 'AICC'
+    
+    ERGO.pik.wyniki_2_ist <- cbind(ERGO.pik.zbiór.AIC_2_ist,ERGO.pik.zbiór.BIC_2_ist,ERGO.pik.zbiór.AICC_2_ist,ERGO.pik.Training.set_2_ist,ERGO.pik.Test.set_2_ist)
+    ERGO.pik.wyniki_2_ist
+    
+  # Tabela 6.8
+    ERGO.pik.f_1_ma4_ist <- forecast(ERGO.pik.model3_1.subset,h=8)
+    ERGO.pik.acc.f_1_ma4_ist<- accuracy(ERGO.pik.f_1_ma4_ist,ERGO.pik.test1)[,kryteria]
+    
+    ERGO.pik.acc.f2.test_1 <- accuracy(ERGO.pik.f2_1,ERGO.pik.test1)[,kryteria]
+    ERGO.pik.acc.f6.test_1 <- accuracy(ERGO.pik.f6_1,ERGO.pik.test1)[,kryteria]
+    ERGO.pik.acc.f11.test_1 <- accuracy(ERGO.pik.f11_1,ERGO.pik.test1)[,kryteria]
+
+    ERGO.pik.Test.set_1 <- rbind(ERGO.pik.acc.f2.test_1[2,],ERGO.pik.acc.f6.test_1[2,],ERGO.pik.acc.f11.test_1[2,],ERGO.pik.acc.f_1_ma4_ist[2,])
+    rownames(ERGO.pik.Test.set_1)<- c('ar(1) ML','ma(1) ML','ar(4) ML','ma(4) ist')
+    
+    ERGO.pik.Training.set_1 <- rbind(ERGO.pik.acc.f2.test_1[1,],ERGO.pik.acc.f6.test_1[1,],ERGO.pik.acc.f11.test_1[1,],ERGO.pik.acc.f_1_ma4_ist[1,])
+    rownames(ERGO.pik.Training.set_1)<- c('ar(1) ML','ma(1) ML','ar(4) ML','ma(4) ist')
+
+    ERGO.pik.zbiór.AIC_1 <-
+      data.frame(c(
+        ERGO.pik.model1.ar1.ml$aic,
+        ERGO.pik.model1.ma1.ml$aic,
+        ERGO.pik.model1.ar4.ml$aic,
+        ERGO.pik.model3_1.subset$aic
+      ))
+    rownames(ERGO.pik.zbiór.AIC_1)<- c('ar(1) ML','ma(1) ML','ar(4) ML','ma(4) ist')
+    colnames(ERGO.pik.zbiór.AIC_1)<- 'AIC'
+    
+    ERGO.pik.zbiór.BIC_1 <-
+      data.frame(c(
+        ERGO.pik.model1.ar1.ml$bic,
+        ERGO.pik.model1.ma1.ml$bic,
+        ERGO.pik.model1.ar4.ml$bic,
+        ERGO.pik.model3_1.subset$bic
+      ))
+    rownames(ERGO.pik.zbiór.BIC_1)<- c('ar(1) ML','ma(1) ML','ar(4) ML','ma(4) ist')
+    colnames(ERGO.pik.zbiór.BIC_1)<- 'BIC'
+    
+    ERGO.pik.zbiór.AICC_1 <-
+      data.frame(c(
+        ERGO.pik.model1.ar1.ml$aicc,
+        ERGO.pik.model1.ma1.ml$aicc,
+        ERGO.pik.model1.ar4.ml$aicc,
+        ERGO.pik.model3_1.subset$aicc
+      ))
+    rownames(ERGO.pik.zbiór.AICC_1)<- c('ar(1) ML','ma(1) ML','ar(4) ML','ma(4) ist')
+    colnames(ERGO.pik.zbiór.AICC_1)<- 'AICC'
+    
+    ERGO.pik.wyniki_1 <- cbind(ERGO.pik.zbiór.AIC_1,ERGO.pik.zbiór.BIC_1,ERGO.pik.zbiór.AICC_1,ERGO.pik.Training.set_1,ERGO.pik.Test.set_1)
+    ERGO.pik.wyniki_1
+
+  # Rysunek 6.15
+    tsdiag(ERGO.pik.model2.ar1.ml,gof.lag = 23)
+    tsdiag(ERGO.pik.model2.ma1.ml,gof.lag = 23)
+    tsdiag(ERGO.pik.model2.ar4.ml,gof.lag = 23)
+    tsdiag(ERGO.pik.model3_2.subset,gof.lag = 23)    
+    
+  # Tabela 6.9
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=1,type = "Ljung-Box")
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=4,type = "Ljung-Box")
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=5,type = "Ljung-Box")
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=6,type = "Ljung-Box")
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=7,type = "Ljung-Box")
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=8,type = "Ljung-Box")
+    
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=1,type = "Box-Pierce")
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=4,type = "Box-Pierce")
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=5,type = "Box-Pierce")
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=6,type = "Box-Pierce")
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=7,type = "Box-Pierce")
+    Box.test(ERGO.pik.model2.ar1.ml$residuals,lag=8,type = "Box-Pierce")
+    
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=1,type = "Ljung-Box")
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=4,type = "Ljung-Box")
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=5,type = "Ljung-Box")
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=6,type = "Ljung-Box")
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=7,type = "Ljung-Box")
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=8,type = "Ljung-Box")
+    
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=1,type = "Box-Pierce")
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=4,type = "Box-Pierce")
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=5,type = "Box-Pierce")
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=6,type = "Box-Pierce")
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=7,type = "Box-Pierce")
+    Box.test(ERGO.pik.model2.ma1.ml$residuals,lag=8,type = "Box-Pierce")
+    
+  # Tabela 6.10
+    shapiro.test(ERGO.pik.model2.ar1.ml$residuals) 
+    shapiro.test(ERGO.pik.model2.ma1.ml$residuals)
+    shapiro.test(ERGO.pik.model2.ar4.ml$residuals)
+    shapiro.test(ERGO.pik.model3_2.subset$residuals)
+    
+  # Rysunek 6.16
+    ERGO.pik.f_ar1<- forecast(ERGO.pik.model2.ar1.ml,h=7)
+    ERGO.pik.f_ma1<- forecast(ERGO.pik.model2.ma1.ml,h=7)
+    ERGO.pik.f_ar4<- forecast(ERGO.pik.model2.ar4.ml,h=7)
+    ERGO.pik.f_ma4<- forecast(ERGO.pik.model3_2.subset,h=7)
+    
+    par(mfrow = c(1,1))
+    plot(ERGO.pik.f_ar1, main = 'a) ARIMA(0,0,0)(1,1,0)[4]')
+    lines(ERGO.pik.test2,col="red",lty=2)
+    plot(ERGO.pik.f_ma1, main = 'b) ARIMA(0,0,0)(0,1,1)[4]')
+    lines(ERGO.pik.test2,col="red",lty=2)
+    plot(ERGO.pik.f_ar4, main = 'c) ARIMA(4,0,0)(0,1,0)[4]')
+    lines(ERGO.pik.test2,col="red",lty=2)
+    plot(ERGO.pik.f_ma4, main = 'd) ARIMA(0,0,4)(0,1,0)[4] ist')
+    lines(ERGO.pik.test2,col="red",lty=2)
+    
+  # Tabela 6.11
+    ERGO.pik.f_ar1_wynik <- forecast(ERGO.pik.model2.ar1.ml,h=8)
+    ERGO.pik.f_ma1_wynik <- forecast(ERGO.pik.model2.ma1.ml,h=8)
+    ERGO.pik.f_ar4_wynik <- forecast(ERGO.pik.model2.ar4.ml,h=8)
+    ERGO.pik.f_ma4_wynik <- forecast(ERGO.pik.model3_2.subset,h=8)
+    
+    ERGO.pik.f_ar1_wynik$mean[8]
+    ERGO.pik.f_ma1_wynik$mean[8]
+    ERGO.pik.f_ar4_wynik$mean[8]
+    ERGO.pik.f_ma4_wynik$mean[8]
+
+  # Rysunek 6.17
+    pik <- 134979 + 732339
+    dane_składka.ERGO.ok <-dane_składka.ERGO
+    dane_składka.ERGO.ok[32] <- pik
+
+    plot(dane_składka.ERGO,lwd=2,xlab="Rok", ylab="Składka przypisana (tys. zł)",main="Zmiana wartości odstającej w szeregu ERGO Hestia")
+    lines(dane_składka.ERGO.ok-12000,col="red",lwd=2)
+    lines(dane_składka.ERGO.ok-10000,col="red",type="p",pch=16,cex=0.8)    
+
+  # Rysunek 6.18  
+    dane_składka.ERGO2.2015<-window(dane_składka.ERGO,start=c(2015,1))
+    
+    dni_robocze_Q2015.ts <- ts(read_excel("Dane_do_mgr.xlsx",sheet="Dni_robocze_4Q2020"), start = c(2007,1),frequency = 4)
+    dni_robocze_Q2015.ts.window <- window(dni_robocze_Q2015.ts, start=c(2015,1), end=c(2020,1))
+    srednia.liczba.dni.roboczych <- 1318/(5*4+1)
+    dane_składka.ERGO.2015_trading_days <- (dane_składka.ERGO2.2015/dni_robocze_Q2015.ts.window) * srednia.liczba.dni.roboczych
+
+    ts.plot(dane_składka.ERGO2.2015,dane_składka.ERGO.2015_trading_days,
+            main="Składka przypisana ERGO Hestia 2015 - korekty kalendarzowe",
+            ylab="Składka przypisana (tys. zł)",
+            col=c("black","red"),
+            lty=c(1,2), type="l")
+    legend("bottomright",
+           legend=c("dane oryginalne", "dane skorygowane"),
+           col=c("black","red"),lty=c(1,2))
+    
+  # Transformacja B-C
+    ergo2015_dec_add <- decompose(dane_składka.ERGO.2015_trading_days, type = 'additive')
+    ergo2015_dec_mul <- decompose(dane_składka.ERGO.2015_trading_days, type = 'multiplicative')
+    
+    ergo2015_addytywna <- na.omit(ergo2015_dec_add$random)
+    ergo2015_multyplik.<- na.omit(ergo2015_dec_mul$random)
+    
+    par(mfrow = c(1,2),oma = c(0, 0, 1.1, 0))
+    plot(ergo2015_addytywna,ylab=NULL,xlab=NULL,main="addytywnej")
+    grid()
+    plot(ergo2015_multyplik.,ylab=NULL,xlab=NULL,main="multiplikatywnej")
+    grid()
+    mtext("Reszta z szeregu po dekompozycji:", outer = T, cex = 1.5)  
+
+    adf.test(na.omit(ergo2015_dec_add$random))
+    adf.test(na.omit(ergo2015_dec_mul$random))
+
+    dane_składka.ERGO.2015_trading_days.sqrt <- BoxCox(dane_składka.ERGO.2015_trading_days, lambda=0.5)
+    dane_składka.ERGO.2015_trading_days.log  <- BoxCox(dane_składka.ERGO.2015_trading_days, lambda=0)
+    
+    par(mfrow = c(3,1))
+    plot(dane_składka.ERGO.2015_trading_days, main="dane oryginalne")
+    grid()
+    plot(dane_składka.ERGO.2015_trading_days, main="transformacja pierwiastkowa lamdba=0.5")
+    grid()
+    plot(dane_składka.ERGO.2015_trading_days, main="transformacja logarytmiczna lamdba=0 ") 
+    grid()
+
+    dane_składka.ERGO.2015_trading_days.lambda  <- BoxCox(dane_składka.ERGO.2015_trading_days, lambda=BoxCox.lambda(dane_składka.ERGO.2015_trading_days))
+    
+    par(mfrow = c(2,1))
+    plot(dane_składka.ERGO.2015_trading_days, main="dane oryginalne")
+    grid()
+    plot(dane_składka.ERGO.2015_trading_days.lambda, main="transformacja lamdba=-0.08939707")
+    grid()
+    
+  # Rysunek 6.19  
+    par(mfrow=c(1,2),oma = c(0, 0, 1.1, 0)) 
+    monthplot(dane_składka.ERGO.2015_trading_days,col.base='red3',lty.base=1, lwd.base =2,xlab='Kwartał',ylab='Składka przypisana (tys. zł)')
+    seasonplot(dane_składka.ERGO.2015_trading_days,cex=0.8, col=rainbow(14), year.labels= TRUE, pch=19,main=NULL,xlab='Kwartał')
+    mtext("Wykresy sezonowości dla szeregu ERGO Hestia 2015", outer = T, cex = 1.4)
+
+  # Rysunek 6.20
+    par(mfrow=c(1,2),oma = c(0, 0, 1.1, 0))
+    Acf(dane_składka.ERGO.2015_trading_days,lag.max=20,main="a) ACF")
+    Pacf(dane_składka.ERGO.2015_trading_days,lag.max=20,main="b) PACF")
+    mtext("Wykresy ACF i PACF dla szeregu ERGO Hestia 2015", outer = T, cex = 1.3)
+    
+    par(mfrow=c(1,2))
+    Acf(diff(dane_składka.ERGO.2015_trading_days,lag=1),lag.max=20,main="c) ACF diff=1")
+    Pacf(diff(dane_składka.ERGO.2015_trading_days,lag=1),lag.max=20,main="d) PACF diff=1")
+    
+    Acf(diff(dane_składka.ERGO.2015_trading_days,lag=4),lag.max=20,main="e) ACF diff=4")
+    Pacf(diff(dane_składka.ERGO.2015_trading_days,lag=4),lag.max=20,main="f) PACF diff=4")
+    
+    Acf(diff(diff(dane_składka.ERGO.2015_trading_days,lag=4),lag=1),lag.max=20,main="g) ACF diff=1, diff=4")
+    Pacf(diff(diff(dane_składka.ERGO.2015_trading_days,lag=4),lag=1),lag.max=20,main="h) PACF diff=1, diff=4")
+    
+    
+  # Rysunek 6.21
+    dni_robocze_Q.ts <- window(dni_robocze_Q2015.ts, end=c(2020,1))
+    srednia.liczba.dni.roboczych <- 3333/(13*4+1)
+    dane_składka.ERGO_trading_days <- (dane_składka.ERGO.ok/dni_robocze_Q.ts) * srednia.liczba.dni.roboczych
+    
+    par(mfrow=c(1,2),oma = c(0, 0, 1.1, 0))
+    Acf(dane_składka.ERGO_trading_days,lag.max=20,main="a) ACF")
+    Pacf(dane_składka.ERGO_trading_days,lag.max=20,main="b) PACF")
+    mtext("Wykresy ACF i PACF dla szeregu ERGO Hestia", outer = T, cex = 1.3)
+    
+    par(mfrow=c(1,2))
+    Acf(diff(dane_składka.ERGO_trading_days,lag=1),lag.max=20,main="c) ACF diff=1")
+    Pacf(diff(dane_składka.ERGO_trading_days,lag=1),lag.max=20,main="d) PACF diff=1")
+    
+    Acf(diff(dane_składka.ERGO_trading_days,lag=4),lag.max=20,main="e) ACF diff=4")
+    Pacf(diff(dane_składka.ERGO_trading_days,lag=4),lag.max=20,main="f) PACF diff=4")
+    
+    Acf(diff(diff(dane_składka.ERGO_trading_days,lag=4),lag=1),lag.max=20,main="g) ACF diff=1, diff=4")
+    Pacf(diff(diff(dane_składka.ERGO_trading_days,lag=4),lag=1),lag.max=20,main="h) PACF diff=1, diff=4")
+  
+  # Tabela 6.12
+    adf.test(dane_składka.ERGO.2015_trading_days)
+    adf.test(diff(dane_składka.ERGO.2015_trading_days,lag=1))
+    adf.test(diff(dane_składka.ERGO.2015_trading_days,lag=4))
+
+  # Tabela 6.13
+    adf.test(dane_składka.ERGO_trading_days)
+    adf.test(diff(dane_składka.ERGO_trading_days,lag=1))
+    adf.test(diff(dane_składka.ERGO_trading_days,lag=4))
+    adf.test(diff(diff(dane_składka.ERGO_trading_days,lag=1),lag=4))
+ 
+#############       
+#MODELE ARIMA
+    
+  # Zbiory testowe i treningowe (+walidacyjne)
+    
+    #dla szeregu ERGO Hestia 2015
+    ERGO.2015.train <- window(dane_składka.ERGO.2015_trading_days, end=c(2018,4))
+    ERGO.2015.test <- window(dane_składka.ERGO.2015_trading_days, start=c(2019,1))
+
+    #dla szeregu ERGO Hestia
+    ERGO.train <- window(dane_składka.ERGO_trading_days, end=c(2017,4))
+    ERGO.test <- window(dane_składka.ERGO_trading_days, start=c(2018,1))
+
+  #Modele
+    
+    #dla szeregu ERGO Hestia 2015
+    ERGO.2015.model.MA5 <-
+      Arima(ERGO.2015.train,
+            order = c(0,1,5),
+            seasonal = list(order=c(0,0,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    ERGO.2015.model.MA9 <-
+      Arima(ERGO.2015.train,
+            order = c(0,1,9),
+            seasonal = list(order=c(0,0,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    ERGO.2015.model.AR1 <-
+      Arima(ERGO.2015.train,
+            order = c(1,1,0),
+            seasonal = list(order=c(0,0,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    #dla szeregu ERGO Hestia
+    ERGO.model.MA12 <-
+      Arima(ERGO.train,
+            order = c(0,1,12),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    ERGO.model.AR4 <-
+      Arima(ERGO.train,
+            order = c(4,1,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    ERGO.model.AR11 <-
+      Arima(ERGO.train,
+            order = c(11,1,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("ML"))
+    
+    ERGO.model.ARIMA1 <-
+      Arima(ERGO.train,
+            order = c(0,1,1),
+            seasonal = list(order=c(0,1,1),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    ERGO.model.ARIMA2 <-
+      Arima(ERGO.train,
+            order = c(0,1,1),
+            seasonal = list(order=c(2,0,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+  # Tabela 6.14(Istotność zmiennych)
+    
+    #dla szeregu ERGO Hestia 2015
+    # MA5
+    ERGO.2015.model.MA5.coef <- ERGO.2015.model.MA5$coef
+    ERGO.2015.model.MA5.coef.std <- sqrt(diag(ERGO.2015.model.MA5$var.coef))
+    ratios.MA5.2015 <- ERGO.2015.model.MA5.coef/(1.96*ERGO.2015.model.MA5.coef.std)
+    istotne.MA5.2015 <- which(abs(ratios.MA5.2015)>=1)
+    ratios.MA5.2015
+    
+    # MA9
+    ERGO.2015.model.MA9.coef <- ERGO.2015.model.MA9$coef
+    ERGO.2015.model.MA9.coef.std <- sqrt(diag(ERGO.2015.model.MA9$var.coef))
+    ratios.MA9.2015 <- ERGO.2015.model.MA9.coef/(1.96*ERGO.2015.model.MA9.coef.std)
+    istotne.MA9.2015 <- which(abs(ratios.MA9.2015)>=1)
+    ratios.MA9.2015
+    
+
+    #dla szeregu ERGO Hestia
+    # MA12
+    ERGO.model.MA12.coef <- ERGO.model.MA12$coef
+    ERGO.model.MA12.coef.std <- sqrt(diag(ERGO.model.MA12$var.coef))
+    ratios.MA12 <- ERGO.model.MA12.coef/(1.96*ERGO.model.MA12.coef.std)
+    istotne.MA12 <- which(abs(ratios.MA12)>=1)
+    ratios.MA12
+    
+    # AR4
+    ERGO.model.AR4.coef <- ERGO.model.AR4$coef
+    ERGO.model.AR4.coef.std <- sqrt(diag(ERGO.model.AR4$var.coef))
+    ratios.AR4 <- ERGO.model.AR4.coef/(1.96*ERGO.model.AR4.coef.std)
+    istotne.AR4 <- which(abs(ratios.AR4)>=1)
+    ratios.AR4
+    
+    # AR11
+    ERGO.model.AR11.coef <- ERGO.model.AR11$coef
+    ERGO.model.AR11.coef.std <- sqrt(diag(ERGO.model.AR11$var.coef))
+    ratios.AR11 <- ERGO.model.AR11.coef/(1.96*ERGO.model.AR11.coef.std)
+    istotne.AR11 <- which(abs(ratios.AR11)>=1)
+    ratios.AR11
+    
+    # ARIMA1
+    ERGO.model.ARIMA1.coef <- ERGO.model.ARIMA1$coef
+    ERGO.model.ARIMA1.coef.std <- sqrt(diag(ERGO.model.ARIMA1$var.coef))
+    ratios.ARIMA1 <- ERGO.model.ARIMA1.coef/(1.96*ERGO.model.ARIMA1.coef.std)
+    istotne.ARIMA1 <- which(abs(ratios.ARIMA1)>=1)
+    ratios.ARIMA1
+    
+    # ARIMA2
+    ERGO.model.ARIMA2.coef <- ERGO.model.ARIMA2$coef
+    ERGO.model.ARIMA2.coef.std <- sqrt(diag(ERGO.model.ARIMA2$var.coef))
+    ratios.ARIMA2 <- ERGO.model.ARIMA2.coef/(1.96*ERGO.model.ARIMA2.coef.std)
+    istotne.ARIMA2 <- which(abs(ratios.ARIMA2)>=1)
+    ratios.ARIMA2
+
+ # Nowe modele (po wyrzuceniu nieistotnych zmiennych)  
+    
+    #dla szeregu ERGO Hestia 2015
+    ERGO.2015.model.MA5.fixed<-numeric(5)
+    
+    ERGO.2015.model.MA5.fixed[istotne.MA5.2015]<-NA
+    
+    ERGO.2015.model.MA5.subset <-
+      Arima(ERGO.2015.train,
+            order = c(0,1,5),
+            seasonal = list(order=c(0,0,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=ERGO.2015.model.MA5.fixed)
+    
+    #dla szeregu ERGO Hestia
+    modelMA12.fixed<-numeric(12)
+    modelAR4.fixed<-numeric(4)
+    modelAR11.fixed<-numeric(11)
+    
+    modelMA12.fixed[istotne.MA12]<-NA
+    modelAR4.fixed[istotne.AR4]<-NA
+    modelAR11.fixed[istotne.AR11]<-NA
+    
+    ERGO.model.MA12.subset <-
+      Arima(ERGO.train,
+            order = c(0,1,12),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=modelMA12.fixed)
+    
+    ERGO.model.AR4.subset <-
+      Arima(ERGO.train,
+            order = c(4,1,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=modelAR4.fixed)
+    
+    ERGO.model.AR11.subset <-
+      Arima(ERGO.train,
+            order = c(11,1,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=modelAR11.fixed
+      )
+    
+  # Tabela 6.15
+    #część dla szeregu ERGO Hestia 2015
+    
+    f1.2015 <- forecast(ERGO.2015.model.MA5,h=5)
+    f1.2015.subset <- forecast(ERGO.2015.model.MA5.subset,h=5)
+    f2.2015 <- forecast(ERGO.2015.model.MA9,h=5)
+    f3.2015 <- forecast(ERGO.2015.model.AR1,h=5)
+    
+    kryteria <- c("MAE","RMSE","MAPE","MASE")
+    
+    acc.f1.2015.test <- accuracy(f1.2015,ERGO.2015.test)[,kryteria]
+    acc.f1.2015.test.subset <- accuracy(f1.2015.subset,ERGO.2015.test)[,kryteria]
+    acc.f2.2015.test <- accuracy(f2.2015,ERGO.2015.test)[,kryteria]
+    acc.f3.2015.test <- accuracy(f3.2015,ERGO.2015.test)[,kryteria]
+    
+    Training.set.2015 <-
+      rbind(acc.f1.2015.test[1,],
+            acc.f1.2015.test.subset[1,],
+            acc.f2.2015.test[1,],
+            acc.f3.2015.test[1,])
+    
+    rownames(Training.set.2015)<- c('MA5','MA5 ist','MA9','AR1')
+    
+    Test.set.2015 <-
+      rbind(acc.f1.2015.test[2,],
+            acc.f1.2015.test.subset[2,],
+            acc.f2.2015.test[2,],
+            acc.f3.2015.test[2,])
+    
+    rownames(Test.set.2015)<- c('MA5','MA5 ist','MA9','AR1')
+    
+    zbiór.AIC.2015 <-
+      data.frame(c(
+        ERGO.2015.model.MA5$aic,
+        ERGO.2015.model.MA5.subset$aic,
+        ERGO.2015.model.MA9$aic,
+        ERGO.2015.model.AR1$aic))
+    
+    rownames(zbiór.AIC.2015)<- c('MA5','MA5 ist','MA9','AR1')
+    colnames(zbiór.AIC.2015) <- 'AIC'
+    
+    zbiór.BIC.2015 <-
+      data.frame(c(
+        ERGO.2015.model.MA5$bic,
+        ERGO.2015.model.MA5.subset$bic,
+        ERGO.2015.model.MA9$bic,
+        ERGO.2015.model.AR1$bic))
+    
+    rownames(zbiór.BIC.2015)<- c('MA5','MA5 ist','MA9','AR1')
+    colnames(zbiór.BIC.2015) <- 'BIC'
+    
+    zbiór.AICC.2015 <-
+      data.frame(c(
+        ERGO.2015.model.MA5$aicc,
+        ERGO.2015.model.MA5.subset$aicc,
+        ERGO.2015.model.MA9$aicc,
+        ERGO.2015.model.AR1$aicc))
+    
+    rownames(zbiór.AICC.2015)<- c('MA5','MA5 ist','MA9','AR1')
+    colnames(zbiór.AICC.2015) <- 'AICC'
+    
+    wyniki.2015 <- cbind(zbiór.AIC.2015,zbiór.BIC.2015,zbiór.AICC.2015,
+                         Training.set.2015,Test.set.2015)
+    wyniki.2015
+    
+    #część dla szeregu ERGO Hestia
+    
+    f1 <- forecast(ERGO.model.MA12,h=9)
+    f1.subset <- forecast(ERGO.model.MA12.subset,h=9)
+    f2 <- forecast(ERGO.model.AR4,h=9)
+    f2.subset <- forecast(ERGO.model.AR4.subset,h=9)
+    f3 <- forecast(ERGO.model.AR11,h=9)
+    f3.subset <- forecast(ERGO.model.AR11.subset,h=9)
+    f4 <- forecast(ERGO.model.ARIMA1,h=9)
+    f5 <- forecast(ERGO.model.ARIMA2,h=9)
+    
+    kryteria <- c("MAE","RMSE","MAPE","MASE")
+    
+    acc.f1.test <- accuracy(f1,ERGO.test)[,kryteria]
+    acc.f1.test.subset <- accuracy(f1.subset,ERGO.test)[,kryteria]
+    acc.f2.test <- accuracy(f2,ERGO.test)[,kryteria]
+    acc.f2.test.subset <- accuracy(f2.subset,ERGO.test)[,kryteria]
+    acc.f3.test <- accuracy(f3,ERGO.test)[,kryteria]
+    acc.f3.test.subset <- accuracy(f3.subset,ERGO.test)[,kryteria]
+    acc.f4.test <- accuracy(f4,ERGO.test)[,kryteria]
+    acc.f5.test <- accuracy(f5,ERGO.test)[,kryteria]
+    
+    Training.set <-
+      rbind(acc.f1.test[1,],
+            acc.f1.test.subset[1,],
+            acc.f2.test[1,],
+            acc.f2.test.subset[1,],
+            acc.f3.test[1,],
+            acc.f3.test.subset[1,],
+            acc.f4.test[1,],
+            acc.f5.test[1,])
+    
+    rownames(Training.set)<- c('MA12','MA12 ist','AR4','AR4 ist','AR11','AR11 ist','ARIMA1','ARIMA2')
+    
+    Test.set <-
+      rbind(acc.f1.test[2,],
+            acc.f1.test.subset[2,],
+            acc.f2.test[2,],
+            acc.f2.test.subset[2,],
+            acc.f3.test[2,],
+            acc.f3.test.subset[2,],
+            acc.f4.test[2,],
+            acc.f5.test[2,])
+    
+    rownames(Test.set)<- c('MA12','MA12 ist','AR4','AR4 ist','AR11','AR11 ist','ARIMA1','ARIMA2')
+    
+    zbiór.AIC <-  data.frame(c(
+      ERGO.model.MA12$aic,
+      ERGO.model.MA12.subset$aic,
+      ERGO.model.AR4$aic,
+      ERGO.model.AR4.subset$aic,
+      ERGO.model.AR11$aic,
+      ERGO.model.AR11.subset$aic,
+      ERGO.model.ARIMA1$aic,
+      ERGO.model.ARIMA2$aic))
+    
+    rownames(zbiór.AIC)<- c('MA12','MA12 ist','AR4','AR4 ist','AR11','AR11 ist','ARIMA1','ARIMA2')
+    colnames(zbiór.AIC)<-'AIC'
+    
+    zbiór.AICC <- data.frame(c(
+      ERGO.model.MA12$aicc,
+      ERGO.model.MA12.subset$aicc,
+      ERGO.model.AR4$aicc,
+      ERGO.model.AR4.subset$aicc,
+      ERGO.model.AR11$aicc,
+      ERGO.model.AR11.subset$aicc,
+      ERGO.model.ARIMA1$aicc,
+      ERGO.model.ARIMA2$aicc))
+    rownames(zbiór.AICC)<- c('MA12','MA12 ist','AR4','AR4 ist','AR11','AR11 ist','ARIMA1','ARIMA2')
+    colnames(zbiór.AICC)<-'AICC'
+    
+    zbiór.BIC <- data.frame(c(
+      ERGO.model.MA12$bic,
+      ERGO.model.MA12.subset$bic,
+      ERGO.model.AR4$bic,
+      ERGO.model.AR4.subset$bic,
+      ERGO.model.AR11$bic,
+      ERGO.model.AR11.subset$bic,
+      ERGO.model.ARIMA1$bic,
+      ERGO.model.ARIMA2$bic))
+    rownames(zbiór.BIC)<- c('MA12','MA12 ist','AR4','AR4 ist','AR11','AR11 ist','ARIMA1','ARIMA2')
+    colnames(zbiór.BIC)<-'BIC'
+    
+    wyniki <- cbind(zbiór.AIC,zbiór.BIC,zbiór.AICC,
+                    Training.set,Test.set)
+    wyniki
+    
+    
+  # Zbiory walidacyjne
+    
+    #dla szeregu ERGO Hestia 2015
+    ERGO.2015.train.wal <- window(dane_składka.ERGO.2015_trading_days, end=c(2017,4))
+    ERGO.2015.test.wal <- window(dane_składka.ERGO.2015_trading_days, start=c(2018,1), end=c(2019,4))
+    
+    #dla szeregu ERGO Hestia
+    ERGO.train.wal1 <- window(dane_składka.ERGO_trading_days, end=c(2015,4))
+    ERGO.test.wal1 <- window(dane_składka.ERGO_trading_days, start=c(2016,1), end=c(2017,4))
+    
+    ERGO.train.wal2 <- window(dane_składka.ERGO_trading_days, end=c(2013,4))
+    ERGO.test.wal2 <- window(dane_składka.ERGO_trading_days, start=c(2014,1), end=c(2015,4))
+
+  # Modele na zbiorach walidacyjnych 
+    
+    #dla szeregu ERGO Hestia 2015
+    ERGO.2015.model.MA5.subset.wal <-
+      Arima(ERGO.2015.train.wal,
+            order = c(0,1,5),
+            seasonal = list(order=c(0,0,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=ERGO.2015.model.MA5.fixed)
+    
+    ERGO.2015.model.MA9.wal <-
+      Arima(ERGO.2015.train.wal,
+            order = c(0,1,9),
+            seasonal = list(order=c(0,0,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    ERGO.2015.model.AR1.wal <-
+      Arima(ERGO.2015.train.wal,
+            order = c(1,1,0),
+            seasonal = list(order=c(0,0,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    #dla szeregu ERGO Hestia
+      #walidacyjny1
+    ERGO.model.MA12.wal1 <-
+      Arima(ERGO.train.wal1,
+            order = c(0,1,12),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    ERGO.model.AR4.subset.wal1 <-
+      Arima(ERGO.train.wal1,
+            order = c(4,1,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=modelAR4.fixed)
+    
+    ERGO.model.AR11.subset.wal1 <-
+      Arima(ERGO.train.wal1,
+            order = c(11,1,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("ML"),
+            fixed=modelAR11.fixed)
+    
+    ERGO.model.ARIMA1.wal1 <-
+      Arima(ERGO.train.wal1,
+            order = c(0,1,1),
+            seasonal = list(order=c(0,1,1),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    ERGO.model.ARIMA2.wal1 <-
+      Arima(ERGO.train.wal1,
+            order = c(0,1,1),
+            seasonal = list(order=c(2,0,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+      #walidacyjny2
+    ERGO.model.MA12.wal2 <-
+      Arima(ERGO.train.wal2,
+            order = c(0,1,12),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    ERGO.model.AR4.subset.wal2 <-
+      Arima(ERGO.train.wal2,
+            order = c(4,1,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"),
+            fixed=modelAR4.fixed)
+    
+    ERGO.model.AR11.subset.wal2 <-
+      Arima(ERGO.train.wal2,
+            order = c(11,1,0),
+            seasonal = list(order=c(0,1,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("ML"),
+            fixed=modelAR11.fixed
+      )
+    
+    ERGO.model.ARIMA1.wal2 <-
+      Arima(ERGO.train.wal2,
+            order = c(0,1,1),
+            seasonal = list(order=c(0,1,1),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+    ERGO.model.ARIMA2.wal2 <-
+      Arima(ERGO.train.wal2,
+            order = c(0,1,1),
+            seasonal = list(order=c(2,0,0),period=4),
+            include.drift=F,
+            lambda=NULL,
+            method = c("CSS-ML"))
+    
+  # Tabela 6.16
+    
+    #dla szeregu ERGO Hestia 2015
+    f1.2015.wal <- forecast(ERGO.2015.model.MA5.subset.wal,h=8)
+    f2.2015.wal <- forecast(ERGO.2015.model.MA9.wal,h=8)
+    f3.2015.wal <- forecast(ERGO.2015.model.AR1.wal,h=8)
+    
+    kryteria.wal <- c("MAPE","MASE")
+    
+    acc.f1.2015.test.wal <- accuracy(f1.2015.wal,ERGO.2015.test.wal)[,kryteria.wal]
+    acc.f2.2015.test.wal <- accuracy(f2.2015.wal,ERGO.2015.test.wal)[,kryteria.wal]
+    acc.f3.2015.test.wal <- accuracy(f3.2015.wal,ERGO.2015.test.wal)[,kryteria.wal]
+    
+    Training.set.2015.wal <-
+      rbind(acc.f1.2015.test.wal[1,],
+            acc.f2.2015.test.wal[1,],
+            acc.f3.2015.test.wal[1,])
+    
+    rownames(Training.set.2015.wal)<- c('MA5 ist','MA9','AR1')
+    Training.set.2015.wal
+    
+    Test.set.2015.wal <-
+      rbind(acc.f1.2015.test.wal[2,],
+            acc.f2.2015.test.wal[2,],
+            acc.f3.2015.test.wal[2,])
+    
+    rownames(Test.set.2015.wal)<- c('MA5 ist','MA9','AR1')
+    Test.set.2015.wal
+    
+    zbiór.AIC.2015.wal <-
+      data.frame(c(
+        ERGO.2015.model.MA5.subset.wal$aic,
+        ERGO.2015.model.MA9.wal$aic,
+        ERGO.2015.model.AR1.wal$aic))
+    
+    rownames(zbiór.AIC.2015.wal)<- c('MA5 ist','MA9','AR1')
+    colnames(zbiór.AIC.2015.wal) <- 'AIC'
+    zbiór.AIC.2015.wal
+    
+    zbiór.BIC.2015.wal <-
+      data.frame(c(
+        ERGO.2015.model.MA5.subset.wal$bic,
+        ERGO.2015.model.MA9.wal$bic,
+        ERGO.2015.model.AR1.wal$bic))
+    
+    rownames(zbiór.BIC.2015.wal)<- c('MA5 ist','MA9','AR1')
+    colnames(zbiór.BIC.2015.wal) <- 'BIC'
+    zbiór.BIC.2015.wal
+    
+    zbiór.AICC.2015.wal <-
+      data.frame(c(
+        ERGO.2015.model.MA5.subset.wal$aicc,
+        ERGO.2015.model.MA9.wal$aicc,
+        ERGO.2015.model.AR1.wal$aicc))
+    
+    rownames(zbiór.AICC.2015.wal)<- c('MA5 ist','MA9','AR1')
+    colnames(zbiór.AICC.2015.wal) <- 'AICC'
+    zbiór.AICC.2015
+    
+    wyniki.2015.wal <- cbind(zbiór.AIC.2015.wal,zbiór.BIC.2015.wal,zbiór.AICC.2015.wal,
+                             Training.set.2015.wal,Test.set.2015.wal)
+    wyniki.2015.wal
+    
+    #dla szeregu ERGO Hestia
+    
+      #walidacyjny1
+    f1.wal1 <- forecast(ERGO.model.MA12.wal1,h=8)
+    f2.wal1 <- forecast(ERGO.model.AR4.subset.wal1,h=8)
+    f3.wal1 <- forecast(ERGO.model.AR11.subset.wal1,h=8)
+    f4.wal1 <- forecast(ERGO.model.ARIMA1.wal1,h=8)
+    f5.wal1 <- forecast(ERGO.model.ARIMA2.wal1,h=8)
+    
+    kryteria.wal1 <- c("MAPE","MASE")
+    
+    acc.f1.test.wal1 <- accuracy(f1.wal1,ERGO.test.wal1)[,kryteria.wal1]
+    acc.f2.test.wal1 <- accuracy(f2.wal1,ERGO.test.wal1)[,kryteria.wal1]
+    acc.f3.test.wal1 <- accuracy(f3.wal1,ERGO.test.wal1)[,kryteria.wal1]
+    acc.f4.test.wal1 <- accuracy(f4.wal1,ERGO.test.wal1)[,kryteria.wal1]
+    acc.f5.test.wal1 <- accuracy(f5.wal1,ERGO.test.wal1)[,kryteria.wal1]
+    
+    Training.set.wal1 <-
+      rbind(acc.f1.test.wal1[1,],
+            acc.f2.test.wal1[1,],
+            acc.f3.test.wal1[1,],
+            acc.f4.test.wal1[1,],
+            acc.f5.test.wal1[1,])
+    
+    rownames(Training.set.wal1)<- c('MA12','AR4 ist','AR11 ist','ARIMA1','ARIMA2')
+    Training.set.wal1
+    
+    Test.set.wal1 <-
+      rbind(acc.f1.test.wal1[2,],
+            acc.f2.test.wal1[2,],
+            acc.f3.test.wal1[2,],
+            acc.f4.test.wal1[2,],
+            acc.f5.test.wal1[2,])
+    
+    rownames(Test.set.wal1)<- c('MA12','AR4 ist','AR11 ist','ARIMA1','ARIMA2')
+    Test.set.wal1
+    
+    zbiór.AIC.wal1 <-  data.frame(c(
+      ERGO.model.MA12.wal1$aic,
+      ERGO.model.AR4.subset.wal1$aic,
+      ERGO.model.AR11.subset.wal1$aic,
+      ERGO.model.ARIMA1.wal1$aic,
+      ERGO.model.ARIMA2.wal1$aic))
+    
+    rownames(zbiór.AIC.wal1)<- c('MA12','AR4 ist','AR11 ist','ARIMA1','ARIMA2')
+    colnames(zbiór.AIC.wal1)<-'AIC'
+    zbiór.AIC.wal1
+    
+    zbiór.AICC.wal1 <- data.frame(c(
+      ERGO.model.MA12.wal1$aicc,
+      ERGO.model.AR4.subset.wal1$aicc,
+      ERGO.model.AR11.subset.wal1$aicc,
+      ERGO.model.ARIMA1.wal1$aicc,
+      ERGO.model.ARIMA2.wal1$aicc))
+    rownames(zbiór.AICC.wal1)<- c('MA12','AR4 ist','AR11 ist','ARIMA1','ARIMA2')
+    colnames(zbiór.AICC.wal1)<-'AICC'
+    zbiór.AICC.wal1
+    
+    zbiór.BIC.wal1 <- data.frame(c(
+      ERGO.model.MA12.wal1$bic,
+      ERGO.model.AR4.subset.wal1$bic,
+      ERGO.model.AR11.subset.wal1$bic,
+      ERGO.model.ARIMA1.wal1$bic,
+      ERGO.model.ARIMA2.wal1$bic))
+    rownames(zbiór.BIC.wal1)<- c('MA12','AR4 ist','AR11 ist','ARIMA1','ARIMA2')
+    colnames(zbiór.BIC.wal1)<-'BIC'
+    zbiór.BIC.wal1
+    
+    wyniki.wal1 <- cbind(zbiór.AIC.wal1,zbiór.BIC.wal1,zbiór.AICC.wal1,
+                         Training.set.wal1,Test.set.wal1)
+    wyniki.wal1
+    
+      #walidacyjny2
+    f1.wal2 <- forecast(ERGO.model.MA12.wal2,h=8)
+    f2.wal2 <- forecast(ERGO.model.AR4.subset.wal2,h=8)
+    f3.wal2 <- forecast(ERGO.model.AR11.subset.wal2,h=8)
+    f4.wal2 <- forecast(ERGO.model.ARIMA1.wal2,h=8)
+    f5.wal2 <- forecast(ERGO.model.ARIMA2.wal2,h=8)
+    
+    kryteria.wal2 <- c("MAPE","MASE")
+    
+    acc.f1.test.wal2 <- accuracy(f1.wal2,ERGO.test.wal2)[,kryteria.wal2]
+    acc.f2.test.wal2 <- accuracy(f2.wal2,ERGO.test.wal2)[,kryteria.wal2]
+    acc.f3.test.wal2 <- accuracy(f3.wal2,ERGO.test.wal2)[,kryteria.wal2]
+    acc.f4.test.wal2 <- accuracy(f4.wal2,ERGO.test.wal2)[,kryteria.wal2]
+    acc.f5.test.wal2 <- accuracy(f5.wal2,ERGO.test.wal2)[,kryteria.wal2]
+    
+    Training.set.wal2 <-
+      rbind(acc.f1.test.wal2[1,],
+            acc.f2.test.wal2[1,],
+            acc.f3.test.wal2[1,],
+            acc.f4.test.wal2[1,],
+            acc.f5.test.wal2[1,])
+    
+    rownames(Training.set.wal2)<- c('MA12','AR4 ist','AR11 ist','ARIMA1','ARIMA2')
+    Training.set.wal2
+    
+    Test.set.wal2 <-
+      rbind(acc.f1.test.wal2[2,],
+            acc.f2.test.wal2[2,],
+            acc.f3.test.wal2[2,],
+            acc.f4.test.wal2[2,],
+            acc.f5.test.wal2[2,])
+    
+    rownames(Test.set.wal2)<- c('MA12','AR4 ist','AR11 ist','ARIMA1','ARIMA2')
+    Test.set.wal2
+    
+    zbiór.AIC.wal2 <-  data.frame(c(
+      ERGO.model.MA12.wal2$aic,
+      ERGO.model.AR4.subset.wal2$aic,
+      ERGO.model.AR11.subset.wal2$aic,
+      ERGO.model.ARIMA1.wal2$aic,
+      ERGO.model.ARIMA2.wal2$aic))
+    
+    rownames(zbiór.AIC.wal2)<- c('MA12','AR4 ist','AR11 ist','ARIMA1','ARIMA2')
+    colnames(zbiór.AIC.wal2)<-'AIC'
+    zbiór.AIC.wal2
+    
+    zbiór.AICC.wal2 <- data.frame(c(
+      ERGO.model.MA12.wal2$aicc,
+      ERGO.model.AR4.subset.wal2$aicc,
+      ERGO.model.AR11.subset.wal2$aicc,
+      ERGO.model.ARIMA1.wal2$aicc,
+      ERGO.model.ARIMA2.wal2$aicc))
+    rownames(zbiór.AICC.wal2)<- c('MA12','AR4 ist','AR11 ist','ARIMA1','ARIMA2')
+    colnames(zbiór.AICC.wal2)<-'AICC'
+    zbiór.AICC.wal2
+    
+    zbiór.BIC.wal2 <- data.frame(c(
+      ERGO.model.MA12.wal2$bic,
+      ERGO.model.AR4.subset.wal2$bic,
+      ERGO.model.AR11.subset.wal2$bic,
+      ERGO.model.ARIMA1.wal2$bic,
+      ERGO.model.ARIMA2.wal2$bic))
+    rownames(zbiór.BIC.wal2)<- c('MA12','AR4 ist','AR11 ist','ARIMA1','ARIMA2')
+    colnames(zbiór.BIC.wal2)<-'BIC'
+    zbiór.BIC.wal2
+    
+    wyniki.wal2 <- cbind(zbiór.AIC.wal2,zbiór.BIC.wal2,zbiór.AICC.wal2,
+                         Training.set.wal2,Test.set.wal2)
+    wyniki.wal2
+    
+ # Analiza reszt modelu - wykresy ACF, PACF
+    
+    #dla szeregu ERGO Hestia 2015
+    tsdisplay(ERGO.2015.model.MA5.subset$residuals,lag=12) 
+    tsdisplay(ERGO.2015.model.MA9$residuals,lag=12) 
+    tsdisplay(ERGO.2015.model.AR1$residuals,lag=12) 
+
+    #dla szeregu ERGO Hestia
+    tsdisplay(ERGO.model.MA12$residuals) 
+    tsdisplay(ERGO.model.AR4.subset$residuals)
+    tsdisplay(ERGO.model.AR11.subset$residuals)
+    tsdisplay(ERGO.model.ARIMA1$residuals)
+    tsdisplay(ERGO.model.ARIMA2$residuals)
+    
+  # Tabela 6.17
+    
+    #dla szeregu ERGO Hestia 2015
+    Box.test(ERGO.2015.model.MA5.subset$residuals,lag=12,type = "Ljung-Box")
+    
+    #dla szeregu ERGO Hestia
+    Box.test(ERGO.model.MA12$residuals,lag=12,type = "Ljung-Box")
+    Box.test(ERGO.model.AR4.subset$residuals,lag=12,type = "Ljung-Box")
+    Box.test(ERGO.model.ARIMA1$residuals,lag=12,type = "Ljung-Box")
+    
+ # Tabela 6.18
+    
+    #dla szeregu ERGO Hestia 2015
+    shapiro.test(ERGO.2015.model.MA5.subset$residuals)
+    shapiro.test(ERGO.2015.model.MA9$residuals)
+    shapiro.test(ERGO.2015.model.AR1$residuals)
+    
+    #dla szeregu ERGO Hestia
+    shapiro.test(ERGO.model.MA12$residuals)
+    shapiro.test(ERGO.model.AR4.subset$residuals)
+    shapiro.test(ERGO.model.AR11.subset$residuals)
+    shapiro.test(ERGO.model.ARIMA1$residuals)
+    shapiro.test(ERGO.model.ARIMA2$residuals)
+    
+ # Wykres 6.22
+    
+    f1.2015.ok <- forecast(ERGO.2015.model.MA5,h=12)
+    f2.2015.ok <- forecast(ERGO.2015.model.MA9,h=12)
+    f3.2015.ok <- forecast(ERGO.2015.model.AR1,h=12)
+    
+    
+    y.zakres<-c(0.9,1.2) * range(ERGO.2015.train,ERGO.2015.test)
+    
+    par(mfrow = c(1,1))
+    plot(f1.2015.ok,ylim = y.zakres,main="Prognoza modelu MA(5)")
+    lines(ERGO.2015.test,col="red",lty=2)
+    
+    plot(f2.2015.ok,ylim = y.zakres,main="Prognoza modelu MA(9)")
+    lines(ERGO.2015.test,col="red",lty=2)
+    
+    plot(f3.2015.ok,ylim = y.zakres,main="Prognoza modelu AR(1)")
+    lines(ERGO.2015.test,col="red",lty=2)
+        
+  # Wykres 6.23, 6.24
+    
+    f1.ok <- forecast(ERGO.model.MA12,h=16)
+    f2.ok <- forecast(ERGO.model.AR4.subset,h=16)
+    f3.ok <- forecast(ERGO.model.AR11.subset,h=16)
+    f4.ok <- forecast(ERGO.model.ARIMA1,h=16)
+    f5.ok <- forecast(ERGO.model.ARIMA2,h=16)
+    
+    y.zakres<-c(0.9,1.2) * range(ERGO.train,ERGO.test)
+    
+    par(mfrow = c(1,1))
+    plot(f1.ok,ylim = y.zakres,main="Prognoza modelu MA(12)")
+    lines(ERGO.test,col="red",lty=2)
+    
+    plot(f2.ok,ylim = y.zakres,main="Prognoza modelu AR(4) ist")
+    lines(ERGO.test,col="red",lty=2)
+    
+    plot(f3.ok,ylim = y.zakres,main="Prognoza modelu AR(11) ist")
+    lines(ERGO.test,col="red",lty=2)
+    
+    plot(f4.ok,ylim = y.zakres,main="Prognoza modelu ARIMA1")
+    lines(ERGO.test,col="red",lty=2)
+    
+    plot(f5.ok,ylim = y.zakres,main="Prognoza modelu ARIMA2")
+    lines(ERGO.test,col="red",lty=2)
+
+#Modele wygładzania wykładniczego
+    
+    #dla szeregu ERGO Hestia 2015
+    model2015_ZAN <- ets(ERGO.2015.train, model=("ZAN"))
+    model2015_ZANt <- ets(ERGO.2015.train, model=("ZAN"),damped = T)
+    model2015_ZAA <- ets(ERGO.2015.train, model=("ZAA"))
+    model2015_ZAAt <- ets(ERGO.2015.train, model=("ZAA"),damped = T)
+    model2015_ZAM <- ets(ERGO.2015.train, model=("ZAM"))
+    model2015_ZAMt <- ets(ERGO.2015.train, model=("ZAM"),damped = T)
+    model2015_ZMN <- ets(ERGO.2015.train, model=("ZMN"))
+    model2015_ZMNt <- ets(ERGO.2015.train, model=("ZMN"),damped = T)
+    model2015_ZMM <- ets(ERGO.2015.train, model=("ZMM"))
+    model2015_ZMMt <- ets(ERGO.2015.train, model=("ZMM"),damped = T)
+
+    #dla szeregu ERGO Hestia
+    model_ZAN <- ets(ERGO.train, model=("ZAN"))
+    model_ZANt <- ets(ERGO.train, model=("ZAN"),damped = T)
+    model_ZAA <- ets(ERGO.train, model=("ZAA"))
+    model_ZAAt <- ets(ERGO.train, model=("ZAA"),damped = T)
+    model_ZAM <- ets(ERGO.train, model=("ZAM"))
+    model_ZAMt <- ets(ERGO.train, model=("ZAM"),damped = T)
+    model_ZMN <- ets(ERGO.train, model=("ZMN"))
+    model_ZMNt <- ets(ERGO.train, model=("ZMN"),damped = T)
+    model_ZMM <- ets(ERGO.train, model=("ZMM"),damped = F)
+    model_ZMMt <- ets(ERGO.train, model=("ZMM"),damped = T)
+    
+  # Tabela 6.19
+    
+    #dla szeregu ERGO Hestia 2015
+    fZAN_2015 <- forecast(model2015_ZAN,h=5)
+    fZANt_2015 <- forecast(model2015_ZANt,h=5)
+    fZAA_2015 <- forecast(model2015_ZAA,h=5)
+    fZAAt_2015 <- forecast(model2015_ZAAt,h=5)
+    fZAM_2015 <- forecast(model2015_ZAM,h=5)
+    fZAMt_2015 <- forecast(model2015_ZAMt,h=5)
+    fZMN_2015 <- forecast(model2015_ZMN,h=5)
+    fZMNt_2015 <- forecast(model2015_ZMNt,h=5)
+    fZMM_2015 <- forecast(model2015_ZMM,h=5)
+    fZMMt_2015 <- forecast(model2015_ZMMt,h=5)
+    
+    kryteria.es.train_2015 <-rbind(
+      accuracy(fZAN_2015,ERGO.2015.test)[1,kryteria],
+      accuracy(fZANt_2015,ERGO.2015.test)[1,kryteria],
+      accuracy(fZAA_2015,ERGO.2015.test)[1,kryteria],
+      accuracy(fZAAt_2015,ERGO.2015.test)[1,kryteria],
+      accuracy(fZAM_2015,ERGO.2015.test)[1,kryteria],
+      accuracy(fZAMt_2015,ERGO.2015.test)[1,kryteria],
+      accuracy(fZMN_2015,ERGO.2015.test)[1,kryteria],
+      accuracy(fZMNt_2015,ERGO.2015.test)[1,kryteria],
+      accuracy(fZMM_2015,ERGO.2015.test)[1,kryteria],
+      accuracy(fZMMt_2015,ERGO.2015.test)[1,kryteria]
+    )
+    kryteria.es.train.df_2015 <- data.frame(kryteria.es.train_2015)
+    rownames(kryteria.es.train.df_2015)<- c('AN','AtN','AA','AtA','AM','AtM','MN','MtN','MM','MtM')
+    kryteria.es.train.df_2015
+    
+    
+    kryteria.es.test_2015 <-rbind(
+      accuracy(fZAN_2015,ERGO.2015.test)[2,kryteria],
+      accuracy(fZANt_2015,ERGO.2015.test)[2,kryteria],
+      accuracy(fZAA_2015,ERGO.2015.test)[2,kryteria],
+      accuracy(fZAAt_2015,ERGO.2015.test)[2,kryteria],
+      accuracy(fZAM_2015,ERGO.2015.test)[2,kryteria],
+      accuracy(fZAMt_2015,ERGO.2015.test)[2,kryteria],
+      accuracy(fZMN_2015,ERGO.2015.test)[2,kryteria],
+      accuracy(fZMNt_2015,ERGO.2015.test)[2,kryteria],
+      accuracy(fZMM_2015,ERGO.2015.test)[2,kryteria],
+      accuracy(fZMMt_2015,ERGO.2015.test)[2,kryteria]
+    )
+    kryteria.es.test.df_2015 <- data.frame(kryteria.es.test_2015)
+    rownames(kryteria.es.test.df_2015)<- c('AN','AtN','AA','AtA','AM','AtM','MN','MtN','MM','MtM')
+    kryteria.es.test.df_2015
+    
+    
+   summary(fZAN_2015)
+   summary(fZANt_2015)
+   summary(fZAA_2015)
+   summary(fZAAt_2015)
+   summary(fZAM_2015)
+   summary(fZAMt_2015)
+   summary(fZMN_2015)
+   summary(fZMNt_2015)
+   summary(fZMM_2015)
+   summary(fZMMt_2015)
+   
+   #dla szeregu ERGO Hestia
+   fZAN <- forecast(model_ZAN,h=5)
+   fZANt <- forecast(model_ZANt,h=5)
+   fZAA <- forecast(model_ZAA,h=5)
+   fZAAt <- forecast(model_ZAAt,h=5)
+   fZAM <- forecast(model_ZAM,h=5)
+   fZAMt <- forecast(model_ZAMt,h=5)
+   fZMN <- forecast(model_ZMN,h=5)
+   fZMNt <- forecast(model_ZMNt,h=5)
+   fZMM <- forecast(model_ZMM,h=5)
+   fZMMt <- forecast(model_ZMMt,h=5)
+   
+   kryteria.es.train <-rbind(
+     accuracy(fZAN,ERGO.test)[1,kryteria],
+     accuracy(fZANt,ERGO.test)[1,kryteria],
+     accuracy(fZAA,ERGO.test)[1,kryteria],
+     accuracy(fZAAt,ERGO.test)[1,kryteria],
+     accuracy(fZAM,ERGO.test)[1,kryteria],
+     accuracy(fZAMt,ERGO.test)[1,kryteria],
+     accuracy(fZMN,ERGO.test)[1,kryteria],
+     accuracy(fZMNt,ERGO.test)[1,kryteria],
+     accuracy(fZMM,ERGO.test)[1,kryteria],
+     accuracy(fZMMt,ERGO.test)[1,kryteria]
+   )
+   kryteria.es.train.df <- data.frame(kryteria.es.train)
+   rownames(kryteria.es.train.df)<- c('AN','AtN','AA','AtA','AM','AtM','MN','MtN','MM','MtM')
+   kryteria.es.train.df
+   
+   
+   kryteria.es.test <-rbind(
+     accuracy(fZAN,ERGO.test)[2,kryteria],
+     accuracy(fZANt,ERGO.test)[2,kryteria],
+     accuracy(fZAA,ERGO.test)[2,kryteria],
+     accuracy(fZAAt,ERGO.test)[2,kryteria],
+     accuracy(fZAM,ERGO.test)[2,kryteria],
+     accuracy(fZAMt,ERGO.test)[2,kryteria],
+     accuracy(fZMN,ERGO.test)[2,kryteria],
+     accuracy(fZMNt,ERGO.test)[2,kryteria],
+     accuracy(fZMM,ERGO.test)[2,kryteria],
+     accuracy(fZMMt,ERGO.test)[2,kryteria]
+   )
+   kryteria.es.test.df <- data.frame(kryteria.es.test)
+   rownames(kryteria.es.test.df)<- c('AN','AtN','AA','AtA','AM','AtM','MN','MtN','MM','MtM')
+   kryteria.es.test.df
+   
+
+ # Tabela 6.20
+   
+   #dla szeregu ERGO Hestia 2015
+   model_ZANt_2015_wal <- ets(ERGO.2015.train.wal, model=("ZAN"),damped = T)
+   model_ZAAt_2015_wal <- ets(ERGO.2015.train.wal, model=("ZAA"),damped = T)
+   model_ZAMt_2015_wal <- ets(ERGO.2015.train.wal, model=("ZAM"),damped = T)
+   
+   
+   fZANt_2015_wal <- forecast(model_ZANt_2015_wal,h=5)
+
+   kryteria.es.train_2015_wal <-rbind(
+     accuracy(fZANt_2015_wal,ERGO.2015.test)[1,kryteria])
+   
+   kryteria.es.train.df_2015_wal <- data.frame(kryteria.es.train_2015_wal)
+   rownames(kryteria.es.train.df_2015_wal)<- c('AtN')
+   kryteria.es.train.df_2015_wal
+   
+
+   kryteria.es.test_2015_wal <-rbind(
+     accuracy(fZANt_2015_wal,ERGO.2015.test)[2,kryteria])
+   
+   kryteria.es.test.df_2015_wal <- data.frame(kryteria.es.test_2015_wal)
+   rownames(kryteria.es.test.df_2015_wal)<- c('AtN')
+   kryteria.es.test.df_2015_wal
+   
+   summary(fZANt_2015_wal)
+   
+   #dla szeregu ERGO Hestia
+   
+    #walidacyjny1
+   model_ZANt.wal1 <- ets(ERGO.train.wal1, model=("ZAN"),damped = T)
+   model_ZAAt.wal1 <- ets(ERGO.train.wal1, model=("ZAA"),damped = T)
+   model_ZAMt.wal1 <- ets(ERGO.train.wal1, model=("ZAM"),damped = T)
+   
+   
+   fZANt.wal1 <- forecast(model_ZANt.wal1,h=5)
+   fZAAt.wal1 <- forecast(model_ZAAt.wal1,h=5)
+   fZAMt.wal1 <- forecast(model_ZAMt.wal1,h=5)
+   
+   
+   kryteria.es.train.wal1 <-rbind(
+     accuracy(fZANt.wal1,ERGO.test.wal1)[1,kryteria.wal1],
+     accuracy(fZAAt.wal1,ERGO.test.wal1)[1,kryteria.wal1],
+     accuracy(fZAMt.wal1,ERGO.test.wal1)[1,kryteria.wal1]
+   )
+   kryteria.es.train.df.wal1 <- data.frame(kryteria.es.train.wal1)
+   rownames(kryteria.es.train.df.wal1)<- c('AtN','AtA','AtM')
+   kryteria.es.train.df.wal1
+   
+   summary(model_ZAMt.wal1)
+   kryteria.es.test.wal1 <-rbind(
+     accuracy(fZANt.wal1,ERGO.test.wal1)[2,kryteria.wal1],
+     accuracy(fZAAt.wal1,ERGO.test.wal1)[2,kryteria.wal1],
+     accuracy(fZAMt.wal1,ERGO.test.wal1)[2,kryteria.wal1]
+   )
+   kryteria.es.test.df.wal1 <- data.frame(kryteria.es.test.wal1)
+   rownames(kryteria.es.test.df.wal1)<- c('AtN','AtA','AtM')
+   kryteria.es.test.df.wal1
+   
+   summary(fZANt.wal1)
+   summary(fZAAt.wal1)
+   summary(fZAMt.wal1)
+   
+    #walidacyjny2
+   model_ZANt.wal2 <- ets(ERGO.train.wal2, model=("ZAN"),damped = T)
+   model_ZAAt.wal2 <- ets(ERGO.train.wal2, model=("ZAA"),damped = T)
+   model_ZAMt.wal2 <- ets(ERGO.train.wal2, model=("ZAM"),damped = T)
+   
+   
+   fZANt.wal2 <- forecast(model_ZANt.wal2,h=5)
+   fZAAt.wal2 <- forecast(model_ZAAt.wal2,h=5)
+   fZAMt.wal2 <- forecast(model_ZAMt.wal2,h=5)
+   
+   
+   kryteria.es.train.wal2 <-rbind(
+     accuracy(fZANt.wal2,ERGO.test.wal2)[1,kryteria.wal2],
+     accuracy(fZAAt.wal2,ERGO.test.wal2)[1,kryteria.wal2],
+     accuracy(fZAMt.wal2,ERGO.test.wal2)[1,kryteria.wal2]
+   )
+   kryteria.es.train.df.wal2 <- data.frame(kryteria.es.train.wal2)
+   rownames(kryteria.es.train.df.wal2)<- c('AtN','AtA','AtM')
+   kryteria.es.train.df.wal2
+   
+
+   kryteria.es.test.wal2 <-rbind(
+     accuracy(fZANt.wal2,ERGO.test.wal2)[2,kryteria.wal2],
+     accuracy(fZAAt.wal2,ERGO.test.wal2)[2,kryteria.wal2],
+     accuracy(fZAMt.wal2,ERGO.test.wal2)[2,kryteria.wal2]
+   )
+   kryteria.es.test.df.wal2 <- data.frame(kryteria.es.test.wal2)
+   rownames(kryteria.es.test.df.wal2)<- c('AtN','AtA','AtM')
+   kryteria.es.test.df.wal2
+   
+   summary(fZANt.wal2)
+   summary(fZAAt.wal2)
+   summary(fZAMt.wal2)
+   
+  
+  # Analiza reszt - wykresy ACF, PACF
+   
+   #dla szeregu ERGO Hestia 2015
+   tsdisplay(model2015_ZANt$residuals,lag=20) 
+   tsdisplay(model2015_ZAAt$residuals,lag=20) 
+   tsdisplay(model2015_ZAMt$residuals,lag=20) 
+   
+   #dla szeregu ERGO Hestia
+   tsdisplay(model_ZANt$residuals,lag=20) 
+   tsdisplay(model_ZAAt$residuals,lag=20) 
+   tsdisplay(model_ZAMt$residuals,lag=20) 
+   
+  # Tabela 6.21
+
+   Box.test(model_ZANt$residuals,lag=12,type = "Ljung-Box")
+   Box.test(model_ZAMt$residuals,lag=12,type = "Ljung-Box")
+
+
+  #Rysunek 6.25
+   
+   y.zakres.2015<-c(0.9,1.2) * range(ERGO.2015.train,ERGO.2015.test)
+   
+   model_ZANt_2015_ok <- ets(ERGO.2015.train, model=("ZAN"),damped = T)
+   model_ZAAt_2015_ok <- ets(ERGO.2015.train, model=("ZAA"),damped = T)
+   model_ZAMt_2015_ok <- ets(ERGO.2015.train, model=("ZAM"),damped = T)
+   
+   fZANt_2015_ok <- forecast(model_ZANt_2015_ok,h=12)
+   fZAAt_2015_ok <- forecast(model_ZAAt_2015_ok,h=12)
+   fZAMt_2015_ok <- forecast(model_ZAMt_2015_ok,h=12)
+   
+   par(mfrow = c(1,1))
+   plot(fZANt_2015_ok,ylim = y.zakres.2015,main="Prognoza modelu AtN")
+   lines(ERGO.2015.test,col="red",lty=2)
+   
+   par(mfrow = c(1,1))
+   plot(fZAAt_2015_ok,ylim = y.zakres.2015,main="Prognoza modelu AtA")
+   lines(ERGO.2015.test,col="red",lty=2)
+   
+   par(mfrow = c(1,1))
+   plot(fZAMt_2015_ok,ylim = y.zakres.2015,main="Prognoza modelu AtM")
+   lines(ERGO.2015.test,col="red",lty=2)
+   
+   #Rysunek 6.26
+   
+   y.zakres<-c(0.9,1.2) * range(ERGO.train,ERGO.test)
+   
+   model_ZANt_ok <- ets(ERGO.train, model=("ZAN"),damped = T)
+   model_ZAAt_ok <- ets(ERGO.train, model=("ZAA"),damped = T)
+   model_ZAMt_ok <- ets(ERGO.train, model=("ZAM"),damped = T)
+   
+   fZANt_ok <- forecast(model_ZANt_ok,h=12)
+   fZAAt_ok <- forecast(model_ZAAt_ok,h=12)
+   fZAMt_ok <- forecast(model_ZAMt_ok,h=12)
+   
+   par(mfrow = c(1,1))
+   plot(fZANt_ok,ylim = y.zakres,main="Prognoza modelu AtN")
+   lines(ERGO.test,col="red",lty=2)
+   
+   par(mfrow = c(1,1))
+   plot(fZAAt_ok,ylim = y.zakres,main="Prognoza modelu AtA")
+   lines(ERGO.test,col="red",lty=2)
+   
+   par(mfrow = c(1,1))
+   plot(fZAMt_ok,ylim = y.zakres,main="Prognoza modelu AtM")
+   lines(ERGO.test,col="red",lty=2)
+
+   
+ # Tabela 6.22
+   f3.2015.ok$mean[6]
+   f5.ok$mean[10]
+   fZAMt_2015_ok$mean[6]
+   fZAAt_ok$mean[10]
+   
